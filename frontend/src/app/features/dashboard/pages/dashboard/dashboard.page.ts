@@ -108,7 +108,7 @@ interface UserFinancialSummary {
         <h1>Welcome back, {{ currentUser()?.firstName }}!</h1>
         <p>
           @if (isAdmin()) {
-            Community financial overview (all members)
+            Financial overview (all members)
           } @else {
             Here's your financial overview
           }

@@ -69,7 +69,7 @@ import { AuthService } from '../services/auth.service';
           <!-- User info -->
           <div class="user-info">
             <ion-avatar>
-              <img [src]="authService.currentUser()?.photoUrl || 'assets/avatar-placeholder.png'" alt="avatar" />
+              <img [src]="authService.currentUser()?.photoUrl || 'assets/les-homme-dhonneur-colour.png'" alt="avatar" />
             </ion-avatar>
             <h3>{{ authService.currentUser()?.firstName }} {{ authService.currentUser()?.lastName }}</h3>
             <ion-chip [color]="authService.isAdmin() ? 'warning' : 'primary'" size="small">

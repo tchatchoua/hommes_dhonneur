@@ -50,8 +50,9 @@ import { AuthService } from '@core/services/auth.service';
     <ion-content class="ion-padding">
       <div class="login-container">
         <div class="logo-section">
+          <img src="assets/les-homme-dhonneur-colour.png" alt="Les Hommes D'honneur Logo" class="logo" />
           <h1>Les Hommes D'honneur</h1>
-          <p>Manage your community's finances with ease</p>
+          <p>Honneur et fidelite</p>
         </div>
 
         <ion-card>
@@ -136,6 +137,14 @@ import { AuthService } from '@core/services/auth.service';
     .logo-section {
       text-align: center;
       margin-bottom: 32px;
+
+      .logo {
+        width: 120px;
+        height: 120px;
+        object-fit: contain;
+        margin-bottom: 16px;
+        border-radius: 16px;
+      }
 
       h1 {
         font-size: 24px;

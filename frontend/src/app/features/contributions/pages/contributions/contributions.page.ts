@@ -33,7 +33,8 @@ import {
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   ModalController,
-  ToastController
+  ToastController,
+  AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -41,7 +42,9 @@ import {
   cashOutline, 
   closeOutline,
   calendarOutline,
-  filterOutline
+  filterOutline,
+  createOutline,
+  trashOutline
 } from 'ionicons/icons';
 import { ContributionService } from '@core/services/contribution.service';
 import { CategoryService } from '@core/services/category.service';
@@ -149,13 +152,28 @@ import { Contribution, Category, User } from '@core/models/models';
                 <p class="meta">
                   <ion-icon name="calendar-outline"></ion-icon>
                   {{ contribution.date | date:'mediumDate' }}
+                  @if (authService.isAdmin() && contribution.userName) {
+                    <span class="user-name">• {{ contribution.userName }}</span>
+                  }
                 </p>
               </ion-label>
-              @if (contribution.categoryName) {
-                <ion-badge slot="end" color="primary">
-                  {{ contribution.categoryName }}
-                </ion-badge>
-              }
+              <div slot="end" class="item-end">
+                @if (contribution.categoryName) {
+                  <ion-badge color="primary">
+                    {{ contribution.categoryName }}
+                  </ion-badge>
+                }
+                @if (authService.isAdmin()) {
+                  <div class="admin-actions">
+                    <ion-button fill="clear" size="small" (click)="openEditModal(contribution)">
+                      <ion-icon slot="icon-only" name="create-outline" color="primary"></ion-icon>
+                    </ion-button>
+                    <ion-button fill="clear" size="small" (click)="confirmDelete(contribution)">
+                      <ion-icon slot="icon-only" name="trash-outline" color="danger"></ion-icon>
+                    </ion-button>
+                  </div>
+                }
+              </div>
             </ion-item>
           }
         </ion-list>
@@ -180,7 +198,7 @@ import { Contribution, Category, User } from '@core/models/models';
                   <ion-icon slot="icon-only" name="close-outline"></ion-icon>
                 </ion-button>
               </ion-buttons>
-              <ion-title>Add Contribution</ion-title>
+              <ion-title>{{ isEditMode() ? 'Edit' : 'Add' }} Contribution</ion-title>
               <ion-buttons slot="end">
                 <ion-button [disabled]="isSaving()" (click)="saveContribution()">
                   @if (isSaving()) {
@@ -340,7 +358,24 @@ import { Contribution, Category, User } from '@core/models/models';
         ion-icon {
           font-size: 14px;
         }
+
+        .user-name {
+          color: var(--ion-color-primary);
+          font-weight: 500;
+        }
       }
+    }
+
+    .item-end {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 0;
     }
   `]
 })
@@ -351,6 +386,8 @@ export class ContributionsPage implements OnInit {
   isLoading = signal(true);
   isSaving = signal(false);
   isModalOpen = signal(false);
+  isEditMode = signal(false);
+  editingContributionId = signal<number | null>(null);
   
   totalContributions = signal(0);
   thisMonthContributions = signal(0);
@@ -372,14 +409,17 @@ export class ContributionsPage implements OnInit {
     private categoryService: CategoryService,
     private userService: UserService,
     public authService: AuthService,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private alertController: AlertController
   ) {
     addIcons({ 
       addOutline, 
       cashOutline, 
       closeOutline,
       calendarOutline,
-      filterOutline
+      filterOutline,
+      createOutline,
+      trashOutline
     });
   }
 
@@ -407,7 +447,12 @@ export class ContributionsPage implements OnInit {
       this.currentPage = 1;
     }
 
-    this.contributionService.getMyContributions().subscribe({
+    // Admin sees all contributions, regular users see only their own
+    const request$ = this.authService.isAdmin() 
+      ? this.contributionService.getAll() 
+      : this.contributionService.getMyContributions();
+
+    request$.subscribe({
       next: (response) => {
         if (response.success && response.data) {
           const items = response.data;
@@ -468,12 +513,29 @@ export class ContributionsPage implements OnInit {
   }
 
   openAddModal(): void {
+    this.isEditMode.set(false);
+    this.editingContributionId.set(null);
     this.resetNewContribution();
+    this.isModalOpen.set(true);
+  }
+
+  openEditModal(contribution: Contribution): void {
+    this.isEditMode.set(true);
+    this.editingContributionId.set(contribution.id);
+    this.newContribution = {
+      userId: contribution.userId,
+      amount: contribution.amount,
+      categoryId: contribution.categoryId,
+      date: new Date(contribution.date).toISOString(),
+      description: contribution.description || ''
+    };
     this.isModalOpen.set(true);
   }
 
   closeModal(): void {
     this.isModalOpen.set(false);
+    this.isEditMode.set(false);
+    this.editingContributionId.set(null);
   }
 
   resetNewContribution(): void {
@@ -484,6 +546,51 @@ export class ContributionsPage implements OnInit {
       date: new Date().toISOString(),
       description: ''
     };
+  }
+
+  async confirmDelete(contribution: Contribution): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Delete Contribution',
+      message: `Are you sure you want to delete this contribution of ${contribution.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.deleteContribution(contribution.id);
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async deleteContribution(id: number): Promise<void> {
+    this.contributionService.delete(id).subscribe({
+      next: async (response) => {
+        if (response.success) {
+          this.loadContributions();
+          const toast = await this.toastController.create({
+            message: 'Contribution deleted successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        const toast = await this.toastController.create({
+          message: 'Failed to delete contribution',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
   }
 
   async saveContribution(): Promise<void> {
@@ -497,7 +604,7 @@ export class ContributionsPage implements OnInit {
       return;
     }
 
-    if (this.authService.isAdmin() && !this.newContribution.userId) {
+    if (this.authService.isAdmin() && !this.newContribution.userId && !this.isEditMode()) {
       const toast = await this.toastController.create({
         message: 'Please select a member',
         duration: 2000,
@@ -509,35 +616,69 @@ export class ContributionsPage implements OnInit {
 
     this.isSaving.set(true);
 
-    this.contributionService.create({
-      userId: this.newContribution.userId || this.authService.currentUser()?.id || 0,
-      amount: this.newContribution.amount,
-      categoryId: this.newContribution.categoryId,
-      date: new Date(this.newContribution.date),
-      description: this.newContribution.description
-    }).subscribe({
-      next: async (response) => {
-        this.isSaving.set(false);
-        if (response.success) {
-          this.closeModal();
-          this.loadContributions();
+    if (this.isEditMode() && this.editingContributionId()) {
+      // Update existing contribution
+      this.contributionService.update(this.editingContributionId()!, {
+        amount: this.newContribution.amount,
+        categoryId: this.newContribution.categoryId,
+        date: new Date(this.newContribution.date),
+        description: this.newContribution.description
+      }).subscribe({
+        next: async (response) => {
+          this.isSaving.set(false);
+          if (response.success) {
+            this.closeModal();
+            this.loadContributions();
+            const toast = await this.toastController.create({
+              message: 'Contribution updated successfully',
+              duration: 2000,
+              color: 'success'
+            });
+            await toast.present();
+          }
+        },
+        error: async () => {
+          this.isSaving.set(false);
           const toast = await this.toastController.create({
-            message: 'Contribution added successfully',
+            message: 'Failed to update contribution',
             duration: 2000,
-            color: 'success'
+            color: 'danger'
           });
           await toast.present();
         }
-      },
-      error: async () => {
-        this.isSaving.set(false);
-        const toast = await this.toastController.create({
-          message: 'Failed to add contribution',
-          duration: 2000,
-          color: 'danger'
-        });
-        await toast.present();
-      }
-    });
+      });
+    } else {
+      // Create new contribution
+      this.contributionService.create({
+        userId: this.newContribution.userId || this.authService.currentUser()?.id || 0,
+        amount: this.newContribution.amount,
+        categoryId: this.newContribution.categoryId,
+        date: new Date(this.newContribution.date),
+        description: this.newContribution.description
+      }).subscribe({
+        next: async (response) => {
+          this.isSaving.set(false);
+          if (response.success) {
+            this.closeModal();
+            this.loadContributions();
+            const toast = await this.toastController.create({
+              message: 'Contribution added successfully',
+              duration: 2000,
+              color: 'success'
+            });
+            await toast.present();
+          }
+        },
+        error: async () => {
+          this.isSaving.set(false);
+          const toast = await this.toastController.create({
+            message: 'Failed to add contribution',
+            duration: 2000,
+            color: 'danger'
+          });
+          await toast.present();
+        }
+      });
+    }
   }
 }

@@ -21,7 +21,16 @@ import {
   IonBackButton,
   IonAvatar,
   IonSegment,
-  IonSegmentButton
+  IonSegmentButton,
+  IonModal,
+  IonInput,
+  IonTextarea,
+  IonSelect,
+  IonSelectOption,
+  IonDatetime,
+  IonDatetimeButton,
+  ToastController,
+  AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -31,12 +40,16 @@ import {
   cashOutline,
   personOutline,
   timeOutline,
-  calendarOutline
+  calendarOutline,
+  createOutline,
+  trashOutline,
+  closeOutline
 } from 'ionicons/icons';
 import { ContributionService } from '@core/services/contribution.service';
 import { DebtService } from '@core/services/debt.service';
 import { UserService } from '@core/services/user.service';
-import { Contribution, Debt, User } from '@core/models/models';
+import { CategoryService } from '@core/services/category.service';
+import { Contribution, Debt, User, Category } from '@core/models/models';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -64,7 +77,14 @@ import { FormsModule } from '@angular/forms';
     IonBackButton,
     IonAvatar,
     IonSegment,
-    IonSegmentButton
+    IonSegmentButton,
+    IonModal,
+    IonInput,
+    IonTextarea,
+    IonSelect,
+    IonSelectOption,
+    IonDatetime,
+    IonDatetimeButton
   ],
   template: `
     <ion-header>
@@ -191,9 +211,19 @@ import { FormsModule } from '@angular/forms';
                           {{ contribution.date | date:'mediumDate' }}
                         </p>
                       </ion-label>
-                      <ion-badge slot="end" color="success">
-                        {{ contribution.categoryName }}
-                      </ion-badge>
+                      <div slot="end" class="item-end">
+                        <ion-badge color="success">
+                          {{ contribution.categoryName }}
+                        </ion-badge>
+                        <div class="admin-actions">
+                          <ion-button fill="clear" size="small" (click)="openEditContributionModal(contribution)">
+                            <ion-icon slot="icon-only" name="create-outline" color="primary"></ion-icon>
+                          </ion-button>
+                          <ion-button fill="clear" size="small" (click)="confirmDeleteContribution(contribution)">
+                            <ion-icon slot="icon-only" name="trash-outline" color="danger"></ion-icon>
+                          </ion-button>
+                        </div>
+                      </div>
                     </ion-item>
                   }
                 </ion-list>
@@ -220,9 +250,19 @@ import { FormsModule } from '@angular/forms';
                           }
                         </p>
                       </ion-label>
-                      <ion-badge slot="end" [color]="getDebtStatusColor(debt.status)">
-                        {{ debt.status }}
-                      </ion-badge>
+                      <div slot="end" class="item-end">
+                        <ion-badge [color]="getDebtStatusColor(debt.status)">
+                          {{ debt.status }}
+                        </ion-badge>
+                        <div class="admin-actions">
+                          <ion-button fill="clear" size="small" (click)="openEditDebtModal(debt)">
+                            <ion-icon slot="icon-only" name="create-outline" color="primary"></ion-icon>
+                          </ion-button>
+                          <ion-button fill="clear" size="small" (click)="confirmDeleteDebt(debt)">
+                            <ion-icon slot="icon-only" name="trash-outline" color="danger"></ion-icon>
+                          </ion-button>
+                        </div>
+                      </div>
                     </ion-item>
                   }
                 </ion-list>
@@ -231,6 +271,154 @@ import { FormsModule } from '@angular/forms';
           </ion-card-content>
         </ion-card>
       }
+
+      <!-- Edit Contribution Modal -->
+      <ion-modal [isOpen]="isContributionModalOpen()" (didDismiss)="closeContributionModal()">
+        <ng-template>
+          <ion-header>
+            <ion-toolbar>
+              <ion-buttons slot="start">
+                <ion-button (click)="closeContributionModal()">
+                  <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-title>Edit Contribution</ion-title>
+              <ion-buttons slot="end">
+                <ion-button [disabled]="isSaving()" (click)="saveContribution()">
+                  @if (isSaving()) {
+                    <ion-spinner name="crescent"></ion-spinner>
+                  } @else {
+                    Save
+                  }
+                </ion-button>
+              </ion-buttons>
+            </ion-toolbar>
+          </ion-header>
+          <ion-content class="ion-padding">
+            <ion-list>
+              <ion-item>
+                <ion-input
+                  [(ngModel)]="editContribution.amount"
+                  type="number"
+                  label="Amount"
+                  labelPlacement="floating"
+                  placeholder="Enter amount"
+                ></ion-input>
+              </ion-item>
+              <ion-item>
+                <ion-select
+                  [(ngModel)]="editContribution.categoryId"
+                  label="Category"
+                  labelPlacement="floating"
+                  placeholder="Select category"
+                >
+                  @for (category of contributionCategories(); track category.id) {
+                    <ion-select-option [value]="category.id">
+                      {{ category.name }}
+                    </ion-select-option>
+                  }
+                </ion-select>
+              </ion-item>
+              <ion-item>
+                <ion-label>Date</ion-label>
+                <ion-datetime-button datetime="edit-contribution-date"></ion-datetime-button>
+              </ion-item>
+              <ion-modal [keepContentsMounted]="true">
+                <ng-template>
+                  <ion-datetime
+                    id="edit-contribution-date"
+                    [(ngModel)]="editContribution.date"
+                    presentation="date"
+                  ></ion-datetime>
+                </ng-template>
+              </ion-modal>
+              <ion-item>
+                <ion-textarea
+                  [(ngModel)]="editContribution.description"
+                  label="Description"
+                  labelPlacement="floating"
+                  placeholder="Add a description (optional)"
+                  [rows]="3"
+                ></ion-textarea>
+              </ion-item>
+            </ion-list>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
+
+      <!-- Edit Debt Modal -->
+      <ion-modal [isOpen]="isDebtModalOpen()" (didDismiss)="closeDebtModal()">
+        <ng-template>
+          <ion-header>
+            <ion-toolbar>
+              <ion-buttons slot="start">
+                <ion-button (click)="closeDebtModal()">
+                  <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+                </ion-button>
+              </ion-buttons>
+              <ion-title>Edit Debt</ion-title>
+              <ion-buttons slot="end">
+                <ion-button [disabled]="isSaving()" (click)="saveDebt()">
+                  @if (isSaving()) {
+                    <ion-spinner name="crescent"></ion-spinner>
+                  } @else {
+                    Save
+                  }
+                </ion-button>
+              </ion-buttons>
+            </ion-toolbar>
+          </ion-header>
+          <ion-content class="ion-padding">
+            <ion-list>
+              <ion-item>
+                <ion-input
+                  [(ngModel)]="editDebt.amount"
+                  type="number"
+                  label="Amount"
+                  labelPlacement="floating"
+                  placeholder="Enter amount"
+                ></ion-input>
+              </ion-item>
+              <ion-item>
+                <ion-select
+                  [(ngModel)]="editDebt.categoryId"
+                  label="Category"
+                  labelPlacement="floating"
+                  placeholder="Select category"
+                >
+                  @for (category of debtCategories(); track category.id) {
+                    <ion-select-option [value]="category.id">
+                      {{ category.name }}
+                    </ion-select-option>
+                  }
+                </ion-select>
+              </ion-item>
+              <ion-item>
+                <ion-label>Due Date</ion-label>
+                <ion-datetime-button datetime="edit-debt-due-date"></ion-datetime-button>
+              </ion-item>
+              <ion-modal [keepContentsMounted]="true">
+                <ng-template>
+                  <ion-datetime
+                    id="edit-debt-due-date"
+                    [(ngModel)]="editDebt.dueDate"
+                    presentation="date"
+                  ></ion-datetime>
+                </ng-template>
+              </ion-modal>
+              <ion-item>
+                <ion-textarea
+                  [(ngModel)]="editDebt.description"
+                  label="Description"
+                  labelPlacement="floating"
+                  placeholder="Add a description (optional)"
+                  [rows]="3"
+                ></ion-textarea>
+              </ion-item>
+            </ion-list>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
     </ion-content>
   `,
   styles: [`
@@ -399,6 +587,18 @@ import { FormsModule } from '@angular/forms';
     ion-item {
       --padding-start: 0;
     }
+
+    .item-end {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 0;
+    }
   `]
 })
 export class UserDashboardPage implements OnInit {
@@ -407,7 +607,28 @@ export class UserDashboardPage implements OnInit {
   contributions = signal<Contribution[]>([]);
   debts = signal<Debt[]>([]);
   isLoading = signal(true);
+  isSaving = signal(false);
+  isContributionModalOpen = signal(false);
+  isDebtModalOpen = signal(false);
+  contributionCategories = signal<Category[]>([]);
+  debtCategories = signal<Category[]>([]);
   selectedTab = 'contributions';
+  
+  editingContributionId: number | null = null;
+  editContribution = {
+    amount: 0,
+    categoryId: 0,
+    date: new Date().toISOString(),
+    description: ''
+  };
+
+  editingDebtId: number | null = null;
+  editDebt = {
+    amount: 0,
+    categoryId: 0,
+    dueDate: new Date().toISOString(),
+    description: ''
+  };
 
   totalContributions = computed(() => 
     this.contributions().reduce((sum, c) => sum + c.amount, 0)
@@ -430,7 +651,10 @@ export class UserDashboardPage implements OnInit {
     private router: Router,
     private userService: UserService,
     private contributionService: ContributionService,
-    private debtService: DebtService
+    private debtService: DebtService,
+    private categoryService: CategoryService,
+    private toastController: ToastController,
+    private alertController: AlertController
   ) {
     addIcons({ 
       walletOutline, 
@@ -439,7 +663,10 @@ export class UserDashboardPage implements OnInit {
       cashOutline,
       personOutline,
       timeOutline,
-      calendarOutline
+      calendarOutline,
+      createOutline,
+      trashOutline,
+      closeOutline
     });
   }
 
@@ -448,9 +675,21 @@ export class UserDashboardPage implements OnInit {
     if (id) {
       this.userId.set(+id);
       this.loadUserData();
+      this.loadCategories();
     } else {
       this.isLoading.set(false);
     }
+  }
+
+  loadCategories(): void {
+    this.categoryService.getAll().subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          this.contributionCategories.set(response.data.filter(c => c.type === 'Contribution'));
+          this.debtCategories.set(response.data.filter(c => c.type === 'Debt'));
+        }
+      }
+    });
   }
 
   loadUserData(): void {
@@ -514,5 +753,217 @@ export class UserDashboardPage implements OnInit {
       case 'Overdue': return 'danger';
       default: return 'medium';
     }
+  }
+
+  // Contribution edit/delete methods
+  openEditContributionModal(contribution: Contribution): void {
+    this.editingContributionId = contribution.id;
+    this.editContribution = {
+      amount: contribution.amount,
+      categoryId: contribution.categoryId,
+      date: new Date(contribution.date).toISOString(),
+      description: contribution.description || ''
+    };
+    this.isContributionModalOpen.set(true);
+  }
+
+  closeContributionModal(): void {
+    this.isContributionModalOpen.set(false);
+    this.editingContributionId = null;
+  }
+
+  async confirmDeleteContribution(contribution: Contribution): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Delete Contribution',
+      message: `Are you sure you want to delete this contribution of ${contribution.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.deleteContribution(contribution.id);
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async deleteContribution(id: number): Promise<void> {
+    this.contributionService.delete(id).subscribe({
+      next: async (response) => {
+        if (response.success) {
+          this.loadUserData();
+          const toast = await this.toastController.create({
+            message: 'Contribution deleted successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        const toast = await this.toastController.create({
+          message: 'Failed to delete contribution',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
+  }
+
+  async saveContribution(): Promise<void> {
+    if (!this.editContribution.amount || !this.editContribution.categoryId) {
+      const toast = await this.toastController.create({
+        message: 'Please fill in required fields',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+
+    this.isSaving.set(true);
+
+    this.contributionService.update(this.editingContributionId!, {
+      amount: this.editContribution.amount,
+      categoryId: this.editContribution.categoryId,
+      date: new Date(this.editContribution.date),
+      description: this.editContribution.description
+    }).subscribe({
+      next: async (response) => {
+        this.isSaving.set(false);
+        if (response.success) {
+          this.closeContributionModal();
+          this.loadUserData();
+          const toast = await this.toastController.create({
+            message: 'Contribution updated successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        this.isSaving.set(false);
+        const toast = await this.toastController.create({
+          message: 'Failed to update contribution',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
+  }
+
+  // Debt edit/delete methods
+  openEditDebtModal(debt: Debt): void {
+    this.editingDebtId = debt.id;
+    this.editDebt = {
+      amount: debt.amount,
+      categoryId: debt.categoryId,
+      dueDate: debt.dueDate ? new Date(debt.dueDate).toISOString() : new Date().toISOString(),
+      description: debt.description || ''
+    };
+    this.isDebtModalOpen.set(true);
+  }
+
+  closeDebtModal(): void {
+    this.isDebtModalOpen.set(false);
+    this.editingDebtId = null;
+  }
+
+  async confirmDeleteDebt(debt: Debt): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Delete Debt',
+      message: `Are you sure you want to delete this debt of ${debt.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.deleteDebt(debt.id);
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async deleteDebt(id: number): Promise<void> {
+    this.debtService.delete(id).subscribe({
+      next: async (response) => {
+        if (response.success) {
+          this.loadUserData();
+          const toast = await this.toastController.create({
+            message: 'Debt deleted successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        const toast = await this.toastController.create({
+          message: 'Failed to delete debt',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
+  }
+
+  async saveDebt(): Promise<void> {
+    if (!this.editDebt.amount || !this.editDebt.categoryId) {
+      const toast = await this.toastController.create({
+        message: 'Please fill in required fields',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+
+    this.isSaving.set(true);
+
+    this.debtService.update(this.editingDebtId!, {
+      amount: this.editDebt.amount,
+      categoryId: this.editDebt.categoryId,
+      dueDate: new Date(this.editDebt.dueDate),
+      description: this.editDebt.description
+    }).subscribe({
+      next: async (response) => {
+        this.isSaving.set(false);
+        if (response.success) {
+          this.closeDebtModal();
+          this.loadUserData();
+          const toast = await this.toastController.create({
+            message: 'Debt updated successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        this.isSaving.set(false);
+        const toast = await this.toastController.create({
+          message: 'Failed to update debt',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
   }
 }

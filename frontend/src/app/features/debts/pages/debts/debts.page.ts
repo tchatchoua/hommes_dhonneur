@@ -34,7 +34,8 @@ import {
   IonInfiniteScrollContent,
   IonSegment,
   IonSegmentButton,
-  ToastController
+  ToastController,
+  AlertController
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { 
@@ -43,7 +44,9 @@ import {
   closeOutline,
   calendarOutline,
   filterOutline,
-  checkmarkCircleOutline
+  checkmarkCircleOutline,
+  createOutline,
+  trashOutline
 } from 'ionicons/icons';
 import { DebtService } from '@core/services/debt.service';
 import { CategoryService } from '@core/services/category.service';
@@ -163,21 +166,36 @@ import { Debt, User, Category } from '@core/models/models';
               <ion-icon name="wallet-outline" slot="start" [color]="getStatusColor(debt.status)"></ion-icon>
               <ion-label>
                 <h2>{{ debt.amount | currency }}</h2>
+                @if (authService.isAdmin() && debt.userName) {
+                  <p class="user-name">{{ debt.userName }}</p>
+                }
                 <p>{{ debt.description || 'No description' }}</p>
                 <p class="meta">
                   <ion-icon name="calendar-outline"></ion-icon>
                   Due: {{ debt.dueDate | date:'mediumDate' }}
                 </p>
               </ion-label>
-              <div slot="end" class="action-buttons">
+              <div slot="end" class="item-end">
                 <ion-badge [color]="getStatusColor(debt.status)">
                   {{ debt.status }}
                 </ion-badge>
-                @if (debt.status === 'Pending') {
-                  <ion-button fill="clear" size="small" (click)="markAsPaid(debt)">
-                    <ion-icon slot="icon-only" name="checkmark-circle-outline"></ion-icon>
-                  </ion-button>
-                }
+                <div class="action-buttons">
+                  @if (debt.status === 'Pending') {
+                    <ion-button fill="clear" size="small" (click)="markAsPaid(debt)">
+                      <ion-icon slot="icon-only" name="checkmark-circle-outline"></ion-icon>
+                    </ion-button>
+                  }
+                  @if (authService.isAdmin()) {
+                    <div class="admin-actions">
+                      <ion-button fill="clear" size="small" color="primary" (click)="openEditModal(debt)">
+                        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
+                      </ion-button>
+                      <ion-button fill="clear" size="small" color="danger" (click)="confirmDelete(debt)">
+                        <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+                      </ion-button>
+                    </div>
+                  }
+                </div>
               </div>
             </ion-item>
           }
@@ -203,7 +221,7 @@ import { Debt, User, Category } from '@core/models/models';
                   <ion-icon slot="icon-only" name="close-outline"></ion-icon>
                 </ion-button>
               </ion-buttons>
-              <ion-title>Add Debt</ion-title>
+              <ion-title>{{ isEditMode() ? 'Edit Debt' : 'Add Debt' }}</ion-title>
               <ion-buttons slot="end">
                 <ion-button [disabled]="isSaving()" (click)="saveDebt()">
                   @if (isSaving()) {
@@ -383,6 +401,23 @@ import { Debt, User, Category } from '@core/models/models';
       align-items: flex-end;
       gap: 4px;
     }
+
+    .item-end {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 0;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: var(--ion-color-primary);
+    }
   `]
 })
 export class DebtsPage implements OnInit {
@@ -393,6 +428,8 @@ export class DebtsPage implements OnInit {
   isLoading = signal(true);
   isSaving = signal(false);
   isModalOpen = signal(false);
+  isEditMode = signal(false);
+  editingDebtId = signal<number | null>(null);
   
   selectedStatus = 'all';
   
@@ -418,7 +455,8 @@ export class DebtsPage implements OnInit {
     private categoryService: CategoryService,
     private userService: UserService,
     public authService: AuthService,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private alertController: AlertController
   ) {
     addIcons({ 
       addOutline, 
@@ -426,7 +464,9 @@ export class DebtsPage implements OnInit {
       closeOutline,
       calendarOutline,
       filterOutline,
-      checkmarkCircleOutline
+      checkmarkCircleOutline,
+      createOutline,
+      trashOutline
     });
   }
 
@@ -464,7 +504,12 @@ export class DebtsPage implements OnInit {
       this.currentPage = 1;
     }
 
-    this.debtService.getMyDebts().subscribe({
+    // Admin sees all debts, regular users see only their own
+    const request$ = this.authService.isAdmin() 
+      ? this.debtService.getAll() 
+      : this.debtService.getMyDebts();
+
+    request$.subscribe({
       next: (response) => {
         if (response.success && response.data) {
           const items = response.data;
@@ -529,12 +574,30 @@ export class DebtsPage implements OnInit {
   }
 
   openAddModal(): void {
+    this.isEditMode.set(false);
+    this.editingDebtId.set(null);
     this.resetNewDebt();
+    this.isModalOpen.set(true);
+  }
+
+  openEditModal(debt: Debt): void {
+    this.isEditMode.set(true);
+    this.editingDebtId.set(debt.id);
+    this.newDebt = {
+      userId: debt.userId,
+      amount: debt.amount,
+      categoryId: debt.categoryId,
+      date: new Date(debt.date).toISOString(),
+      dueDate: debt.dueDate ? new Date(debt.dueDate).toISOString() : new Date().toISOString(),
+      description: debt.description || ''
+    };
     this.isModalOpen.set(true);
   }
 
   closeModal(): void {
     this.isModalOpen.set(false);
+    this.isEditMode.set(false);
+    this.editingDebtId.set(null);
   }
 
   resetNewDebt(): void {
@@ -546,6 +609,51 @@ export class DebtsPage implements OnInit {
       dueDate: new Date().toISOString(),
       description: ''
     };
+  }
+
+  async confirmDelete(debt: Debt): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Delete Debt',
+      message: `Are you sure you want to delete this debt of ${debt.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.deleteDebt(debt.id);
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  async deleteDebt(id: number): Promise<void> {
+    this.debtService.delete(id).subscribe({
+      next: async (response) => {
+        if (response.success) {
+          this.loadDebts();
+          const toast = await this.toastController.create({
+            message: 'Debt deleted successfully',
+            duration: 2000,
+            color: 'success'
+          });
+          await toast.present();
+        }
+      },
+      error: async () => {
+        const toast = await this.toastController.create({
+          message: 'Failed to delete debt',
+          duration: 2000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    });
   }
 
   async saveDebt(): Promise<void> {
@@ -569,7 +677,7 @@ export class DebtsPage implements OnInit {
       return;
     }
 
-    if (this.authService.isAdmin() && !this.newDebt.userId) {
+    if (this.authService.isAdmin() && !this.newDebt.userId && !this.isEditMode()) {
       const toast = await this.toastController.create({
         message: 'Please select a member',
         duration: 2000,
@@ -581,37 +689,72 @@ export class DebtsPage implements OnInit {
 
     this.isSaving.set(true);
 
-    this.debtService.create({
-      userId: this.newDebt.userId || this.authService.currentUser()?.id || 0,
-      amount: this.newDebt.amount,
-      categoryId: this.newDebt.categoryId,
-      date: new Date(this.newDebt.date),
-      dueDate: new Date(this.newDebt.dueDate),
-      description: this.newDebt.description
-    }).subscribe({
-      next: async (response) => {
-        this.isSaving.set(false);
-        if (response.success) {
-          this.closeModal();
-          this.loadDebts();
+    if (this.isEditMode() && this.editingDebtId()) {
+      // Update existing debt
+      this.debtService.update(this.editingDebtId()!, {
+        amount: this.newDebt.amount,
+        categoryId: this.newDebt.categoryId,
+        date: new Date(this.newDebt.date),
+        dueDate: new Date(this.newDebt.dueDate),
+        description: this.newDebt.description
+      }).subscribe({
+        next: async (response) => {
+          this.isSaving.set(false);
+          if (response.success) {
+            this.closeModal();
+            this.loadDebts();
+            const toast = await this.toastController.create({
+              message: 'Debt updated successfully',
+              duration: 2000,
+              color: 'success'
+            });
+            await toast.present();
+          }
+        },
+        error: async () => {
+          this.isSaving.set(false);
           const toast = await this.toastController.create({
-            message: 'Debt added successfully',
+            message: 'Failed to update debt',
             duration: 2000,
-            color: 'success'
+            color: 'danger'
           });
           await toast.present();
         }
-      },
-      error: async () => {
-        this.isSaving.set(false);
-        const toast = await this.toastController.create({
-          message: 'Failed to add debt',
-          duration: 2000,
-          color: 'danger'
-        });
-        await toast.present();
-      }
-    });
+      });
+    } else {
+      // Create new debt
+      this.debtService.create({
+        userId: this.newDebt.userId || this.authService.currentUser()?.id || 0,
+        amount: this.newDebt.amount,
+        categoryId: this.newDebt.categoryId,
+        date: new Date(this.newDebt.date),
+        dueDate: new Date(this.newDebt.dueDate),
+        description: this.newDebt.description
+      }).subscribe({
+        next: async (response) => {
+          this.isSaving.set(false);
+          if (response.success) {
+            this.closeModal();
+            this.loadDebts();
+            const toast = await this.toastController.create({
+              message: 'Debt added successfully',
+              duration: 2000,
+              color: 'success'
+            });
+            await toast.present();
+          }
+        },
+        error: async () => {
+          this.isSaving.set(false);
+          const toast = await this.toastController.create({
+            message: 'Failed to add debt',
+            duration: 2000,
+            color: 'danger'
+          });
+          await toast.present();
+        }
+      });
+    }
   }
 
   async markAsPaid(debt: Debt): Promise<void> {
