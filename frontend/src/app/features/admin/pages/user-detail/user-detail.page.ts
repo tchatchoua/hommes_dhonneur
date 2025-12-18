@@ -156,37 +156,6 @@ import { User } from '@core/models/models';
             </ion-item>
           </ion-card-content>
         </ion-card>
-
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Financial Summary</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
-                <ion-icon name="cash-outline" slot="start" color="success"></ion-icon>
-                <ion-label>
-                  <p>Total Contributions</p>
-                  <h3>{{ userStats().totalContributions | currency }}</h3>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-icon name="wallet-outline" slot="start" color="danger"></ion-icon>
-                <ion-label>
-                  <p>Total Debts</p>
-                  <h3>{{ userStats().totalDebts | currency }}</h3>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-icon name="wallet-outline" slot="start" color="warning"></ion-icon>
-                <ion-label>
-                  <p>Pending Debts</p>
-                  <h3>{{ userStats().pendingDebts | currency }}</h3>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
       }
     </ion-content>
   `,

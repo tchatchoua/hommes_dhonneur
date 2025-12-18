@@ -129,7 +129,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Community Finance Tracker API",
+        Title = "Les Hommes D'honneur API",
         Version = "v1",
         Description = "API for managing community financial contributions, debts, and balances"
     });
@@ -175,7 +175,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Community Finance Tracker API v1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Les Hommes D'honneur API v1");
     });
 }
 

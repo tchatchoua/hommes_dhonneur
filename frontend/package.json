@@ -1,7 +1,7 @@
 {
   "name": "community-finance-tracker",
   "version": "1.0.0",
-  "description": "Community Finance Tracker - Angular/Ionic Frontend",
+  "description": "Les Hommes D'honneur - Angular/Ionic Frontend",
   "private": true,
   "scripts": {
     "ng": "ng",

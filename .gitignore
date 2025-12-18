@@ -492,3 +492,4 @@ db_user_setup.txt
 
 # dotnet sdk management file
 global.json
+**/dist

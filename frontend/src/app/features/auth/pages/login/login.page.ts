@@ -50,7 +50,7 @@ import { AuthService } from '@core/services/auth.service';
     <ion-content class="ion-padding">
       <div class="login-container">
         <div class="logo-section">
-          <h1>Community Finance Tracker</h1>
+          <h1>Les Hommes D'honneur</h1>
           <p>Manage your community's finances with ease</p>
         </div>
 

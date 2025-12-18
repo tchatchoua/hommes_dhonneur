@@ -1,4 +1,4 @@
-# Community Finance Tracker
+# Les Hommes D'honneur
 
 A comprehensive community finance management application built with Angular 19/Ionic 8 frontend and ASP.NET Core 9.0 backend.
 

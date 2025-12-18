@@ -1,4 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import {
@@ -32,16 +33,22 @@ import {
   notificationsOutline,
   mailOutline,
   callOutline,
-  calendarOutline
+  calendarOutline,
+  walletOutline,
+  trendingUpOutline,
+  trendingDownOutline
 } from 'ionicons/icons';
 import { AuthService } from '@core/services/auth.service';
 import { UserService } from '@core/services/user.service';
 import { NotificationService } from '@core/services/notification.service';
+import { ContributionService } from '@core/services/contribution.service';
+import { DebtService } from '@core/services/debt.service';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
   imports: [
+    CommonModule,
     ReactiveFormsModule,
     FormsModule,
     IonHeader,
@@ -291,12 +298,107 @@ import { NotificationService } from '@core/services/notification.service';
       text-align: center;
       margin: 16px 0;
     }
+
+    /* Financial Summary Styles */
+    .financial-summary-card {
+      ion-card-content {
+        padding: 16px;
+      }
+    }
+
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .financial-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--ion-color-light);
+
+      .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        ion-icon {
+          font-size: 24px;
+          color: white;
+        }
+      }
+
+      .stat-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--ion-color-medium);
+        margin-bottom: 4px;
+      }
+
+      .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      &.contributions {
+        .stat-icon {
+          background: linear-gradient(135deg, var(--ion-color-success), var(--ion-color-success-shade));
+        }
+        .stat-value {
+          color: var(--ion-color-success);
+        }
+      }
+
+      &.debts {
+        .stat-icon {
+          background: linear-gradient(135deg, var(--ion-color-danger), var(--ion-color-danger-shade));
+        }
+        .stat-value {
+          color: var(--ion-color-danger);
+        }
+      }
+
+      &.balance {
+        .stat-icon {
+          background: linear-gradient(135deg, var(--ion-color-primary), var(--ion-color-primary-shade));
+        }
+
+        &.positive .stat-value {
+          color: var(--ion-color-success);
+        }
+
+        &.negative .stat-value {
+          color: var(--ion-color-danger);
+        }
+      }
+    }
   `]
 })
 export class ProfilePage implements OnInit {
   profileForm: FormGroup;
   isSaving = signal(false);
   errorMessage = signal('');
+  isLoadingFinancials = signal(true);
+  totalContributions = signal(0);
+  totalDebts = signal(0);
+  netBalance = computed(() => this.totalContributions() - this.totalDebts());
 
   currentUser = computed(() => this.authService.currentUser());
 
@@ -312,6 +414,8 @@ export class ProfilePage implements OnInit {
     private authService: AuthService,
     private userService: UserService,
     private notificationService: NotificationService,
+    private contributionService: ContributionService,
+    private debtService: DebtService,
     private toastController: ToastController
   ) {
     addIcons({ 
@@ -320,7 +424,10 @@ export class ProfilePage implements OnInit {
       notificationsOutline,
       mailOutline,
       callOutline,
-      calendarOutline
+      calendarOutline,
+      walletOutline,
+      trendingUpOutline,
+      trendingDownOutline
     });
 
     this.profileForm = this.fb.group({
@@ -335,6 +442,7 @@ export class ProfilePage implements OnInit {
   ngOnInit(): void {
     this.loadProfile();
     this.loadNotificationSettings();
+    this.loadFinancialSummary();
   }
 
   loadProfile(): void {
@@ -347,6 +455,47 @@ export class ProfilePage implements OnInit {
         username: user.username,
         phoneNumber: user.phoneNumber || ''
       });
+    }
+  }
+
+  loadFinancialSummary(): void {
+    this.isLoadingFinancials.set(true);
+    
+    // Load contributions
+    this.contributionService.getMyContributions().subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          const total = response.data.reduce((sum, c) => sum + c.amount, 0);
+          this.totalContributions.set(total);
+        }
+        this.checkFinancialsLoaded();
+      },
+      error: () => {
+        this.checkFinancialsLoaded();
+      }
+    });
+
+    // Load debts
+    this.debtService.getMyDebts().subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          const total = response.data.reduce((sum, d) => sum + d.amount, 0);
+          this.totalDebts.set(total);
+        }
+        this.checkFinancialsLoaded();
+      },
+      error: () => {
+        this.checkFinancialsLoaded();
+      }
+    });
+  }
+
+  private financialsLoaded = 0;
+  private checkFinancialsLoaded(): void {
+    this.financialsLoaded++;
+    if (this.financialsLoaded >= 2) {
+      this.isLoadingFinancials.set(false);
+      this.financialsLoaded = 0;
     }
   }
 

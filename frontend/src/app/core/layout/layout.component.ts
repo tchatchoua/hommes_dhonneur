@@ -62,7 +62,7 @@ import { AuthService } from '../services/auth.service';
       <ion-menu contentId="main-content" type="overlay">
         <ion-header>
           <ion-toolbar color="primary">
-            <ion-title>Finance Tracker</ion-title>
+            <ion-title>Les Hommes D'honneur</ion-title>
           </ion-toolbar>
         </ion-header>
         <ion-content>
@@ -159,7 +159,7 @@ import { AuthService } from '../services/auth.service';
             <ion-buttons slot="start">
               <ion-menu-button></ion-menu-button>
             </ion-buttons>
-            <ion-title>Community Finance Tracker</ion-title>
+            <ion-title>Les Hommes D'honneur</ion-title>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">

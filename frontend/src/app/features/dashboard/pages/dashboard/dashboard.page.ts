@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   IonHeader,
   IonToolbar,
@@ -293,76 +293,25 @@ interface UserFinancialSummary {
                 <span class="col-balance">Balance</span>
                 <span class="col-pending">Pending</span>
               </div>
-              <ion-accordion-group>
+              <ion-list class="user-summary-list">
                 @for (user of userSummaries(); track user.userId) {
-                  <ion-accordion [value]="'user-' + user.userId">
-                    <ion-item slot="header" class="summary-row">
-                      <ion-icon name="person-outline" slot="start" color="primary"></ion-icon>
-                      <ion-label class="summary-row-content">
-                        <span class="col-name">{{ user.userName }}</span>
-                        <span class="col-contrib success-text">{{ user.totalContributions | currency }}</span>
-                        <span class="col-debt danger-text">{{ user.totalDebts | currency }}</span>
-                        <span class="col-balance" [class.success-text]="user.balance >= 0" [class.danger-text]="user.balance < 0">
-                          {{ user.balance | currency }}
-                        </span>
-                        <ion-badge [color]="user.pendingDebts > 0 ? 'warning' : 'success'" class="col-pending">
-                          {{ user.pendingDebts }}
-                        </ion-badge>
-                      </ion-label>
-                    </ion-item>
-                    <div class="ion-padding" slot="content">
-                      <ion-segment [(ngModel)]="selectedHistoryTab[user.userId]" (ngModelChange)="onTabChange(user.userId, $event)">
-                        <ion-segment-button value="contributions">
-                          <ion-label>Contributions ({{ user.contributions.length }})</ion-label>
-                        </ion-segment-button>
-                        <ion-segment-button value="debts">
-                          <ion-label>Debts ({{ user.debts.length }})</ion-label>
-                        </ion-segment-button>
-                      </ion-segment>
-                      
-                      @if (selectedHistoryTab[user.userId] === 'contributions') {
-                        @if (user.contributions.length === 0) {
-                          <p class="empty-message">No contributions</p>
-                        } @else {
-                          <ion-list class="history-list">
-                            @for (contribution of user.contributions; track contribution.id) {
-                              <ion-item>
-                                <ion-icon name="cash-outline" slot="start" color="success"></ion-icon>
-                                <ion-label>
-                                  <h3>{{ contribution.amount | currency }}</h3>
-                                  <p>{{ contribution.description || contribution.categoryName }}</p>
-                                </ion-label>
-                                <ion-badge slot="end" color="medium">
-                                  {{ contribution.date | date:'shortDate' }}
-                                </ion-badge>
-                              </ion-item>
-                            }
-                          </ion-list>
-                        }
-                      } @else {
-                        @if (user.debts.length === 0) {
-                          <p class="empty-message">No debts</p>
-                        } @else {
-                          <ion-list class="history-list">
-                            @for (debt of user.debts; track debt.id) {
-                              <ion-item>
-                                <ion-icon name="wallet-outline" slot="start" color="danger"></ion-icon>
-                                <ion-label>
-                                  <h3>{{ debt.amount | currency }}</h3>
-                                  <p>{{ debt.description || debt.categoryName }}</p>
-                                </ion-label>
-                                <ion-badge slot="end" [color]="getDebtStatusColor(debt.status)">
-                                  {{ debt.status }}
-                                </ion-badge>
-                              </ion-item>
-                            }
-                          </ion-list>
-                        }
-                      }
-                    </div>
-                  </ion-accordion>
+                  <ion-item button (click)="viewUserDashboard(user.userId)" class="summary-row clickable">
+                    <ion-icon name="person-outline" slot="start" color="primary"></ion-icon>
+                    <ion-label class="summary-row-content">
+                      <span class="col-name">{{ user.userName }}</span>
+                      <span class="col-contrib success-text">{{ user.totalContributions | currency }}</span>
+                      <span class="col-debt danger-text">{{ user.totalDebts | currency }}</span>
+                      <span class="col-balance" [class.success-text]="user.balance >= 0" [class.danger-text]="user.balance < 0">
+                        {{ user.balance | currency }}
+                      </span>
+                      <ion-badge [color]="user.pendingDebts > 0 ? 'warning' : 'success'" class="col-pending">
+                        {{ user.pendingDebts }}
+                      </ion-badge>
+                    </ion-label>
+                    <ion-icon name="arrow-forward-outline" slot="end" color="medium"></ion-icon>
+                  </ion-item>
                 }
-              </ion-accordion-group>
+              </ion-list>
             }
           </ion-card-content>
         </ion-card>
@@ -561,24 +510,20 @@ interface UserFinancialSummary {
       color: var(--ion-color-danger);
     }
 
-    .history-list {
-      margin-top: 12px;
-      max-height: 300px;
-      overflow-y: auto;
+    .user-summary-list {
+      padding: 0;
     }
 
-    ion-segment {
-      margin-bottom: 12px;
-    }
+    .summary-row.clickable {
+      --background: var(--ion-color-light-tint);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
 
-    ion-accordion-group {
-      ion-accordion {
-        margin-bottom: 4px;
-        
-        ion-item[slot="header"] {
-          --background: var(--ion-color-light-tint);
-          border-radius: 8px;
-        }
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       }
     }
 
@@ -708,6 +653,7 @@ export class DashboardPage implements OnInit {
   isAdmin = computed(() => this.authService.isAdmin());
 
   constructor(
+    private router: Router,
     private authService: AuthService,
     private contributionService: ContributionService,
     private debtService: DebtService
@@ -825,5 +771,9 @@ export class DashboardPage implements OnInit {
       case 'Overdue': return 'danger';
       default: return 'medium';
     }
+  }
+
+  viewUserDashboard(userId: number): void {
+    this.router.navigate(['/dashboard/user', userId]);
   }
 }

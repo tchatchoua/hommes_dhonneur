@@ -33,6 +33,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/pages/dashboard/dashboard.page').then(m => m.DashboardPage)
       },
       {
+        path: 'dashboard/user/:id',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/dashboard/pages/user-dashboard/user-dashboard.page').then(m => m.UserDashboardPage)
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./features/profile/pages/profile/profile.page').then(m => m.ProfilePage)
       },

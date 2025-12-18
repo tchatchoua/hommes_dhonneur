@@ -1,4 +1,4 @@
-# Community Finance Tracker App – Product Requirements Document (PRD)
+# Les Hommes D'honneur App – Product Requirements Document (PRD)
 
 ## Purpose
 Provide a secure and user-friendly platform for a small community to manage financial contributions, debts, and balances, with administrative tools for oversight and communication.
