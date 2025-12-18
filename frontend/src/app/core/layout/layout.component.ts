@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { 
   IonHeader, 
   IonToolbar, 
@@ -39,6 +39,8 @@ import { AuthService } from '../services/auth.service';
   standalone: true,
   imports: [
     RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
     IonHeader,
     IonToolbar,
     IonTitle,
